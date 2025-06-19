@@ -8,8 +8,8 @@ app.use(bodyParser.json());
 
 // 🔐 Conectar a Supabase
 const supabase = createClient(
-  process.env.https://ymtagfdcrejmuyqflvif.supabase.co,
-  process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InltdGFnZmRjcmVqbXV5cWZsdmlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyNzI3NTUsImV4cCI6MjA2NTg0ODc1NX0._5V445n-Bpy7_Ahvxwc3CM9f3aRLzBVtiGoMjce-N2I
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
 );
 
 // ✅ Ruta de prueba
