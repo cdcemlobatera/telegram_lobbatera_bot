@@ -45,12 +45,17 @@ bot.on("message", async (msg) => {
 async function buscarCedula(cedula) {
   try {
     const cedulaLimpia = cedula.trim().toUpperCase().replace(/\s+/g, "");
-
+    
+console.log("🔎 Buscando:", cedulaLimpia);
+    
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
       .eq("cedula", cedulaLimpia)
       .single();
+    
+console.log("📦 Resultado:", data);
+console.log("🐞 Error:", error);
 
     if (error || !data) {
       console.warn("🧐 No encontrado:", cedulaLimpia, error?.message);
