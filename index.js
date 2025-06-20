@@ -33,7 +33,9 @@ app.post("/webhook", async (req, res) => {
 async function buscarCedula(cedula) {
   try {
     const cedulaLimpia = cedula.trim().replace(/\D/g, "");
-    const cedulaNum = Number(cedulaLimpia);
+    const cedulaNum = parseInt(cedula.trim().replace(/\D/g, ""), 10);
+    
+    if (isNaN(cedulaNum)) return "⚠️ La cédula ingresada no es válida.";
 
     const { data, error } = await supabase
       .from("raclobatera")
