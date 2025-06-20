@@ -1,7 +1,7 @@
-import express from "express";
-import { createClient } from "@supabase/supabase-js";
-import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
+const express = require("express");
+const TelegramBot = require("node-telegram-bot-api");
+const { createClient } = require("@supabase/supabase-js");
+const dotenv = require("dotenv");
 
 dotenv.config();
 
@@ -18,18 +18,19 @@ const supabase = createClient(
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN);
 bot.setWebHook(`${process.env.RENDER_EXTERNAL_URL}/bot${process.env.TELEGRAM_TOKEN}`);
 
+// Webhook endpoint
 app.post(`/bot${process.env.TELEGRAM_TOKEN}`, express.json(), (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
 
-// Ping route
+// Ping para monitoreo
 app.get("/ping", (req, res) => {
   const now = new Date().toLocaleString("es-VE", { timeZone: "America/Caracas" });
   res.send(`✅ Bot activo - ${now}`);
 });
 
-// Función principal
+// Manejo de mensajes
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const cedula = msg.text;
