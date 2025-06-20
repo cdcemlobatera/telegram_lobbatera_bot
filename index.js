@@ -1,35 +1,46 @@
 import express from "express";
-import bodyParser from "body-parser";
 import { createClient } from "@supabase/supabase-js";
-import fetch from "node-fetch";
+import TelegramBot from "node-telegram-bot-api";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
-app.use(bodyParser.json());
+const PORT = process.env.PORT || 10000;
 
-// 🔐 Conectar a Supabase
+// Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
-// ✅ Ruta de prueba
-app.get("/ping", (req, res) => {
-  res.send("✅ Bot activo - " + new Date().toLocaleString("es-VE"));
-});
+// Telegram
+const bot = new TelegramBot(process.env.TELEGRAM_TOKEN);
+bot.setWebHook(`${process.env.RENDER_EXTERNAL_URL}/bot${process.env.TELEGRAM_TOKEN}`);
 
-// 🎯 Webhook de Telegram
-app.post("/webhook", async (req, res) => {
-  const mensaje = req.body.message?.text;
-  const chatId = req.body.message?.chat?.id;
-
-  if (!mensaje || !chatId) return res.sendStatus(200);
-
-  const respuesta = await buscarCedula(mensaje.trim());
-  await enviarMensajeTelegram(chatId, respuesta);
+app.post(`/bot${process.env.TELEGRAM_TOKEN}`, express.json(), (req, res) => {
+  bot.processUpdate(req.body);
   res.sendStatus(200);
 });
 
-// 🔎 Buscar en Supabase
+// Ping route
+app.get("/ping", (req, res) => {
+  const now = new Date().toLocaleString("es-VE", { timeZone: "America/Caracas" });
+  res.send(`✅ Bot activo - ${now}`);
+});
+
+// Función principal
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const cedula = msg.text;
+
+  if (!cedula) return;
+
+  const respuesta = await buscarCedula(cedula);
+  bot.sendMessage(chatId, respuesta, { parse_mode: "Markdown" });
+});
+
+// Función de búsqueda
 async function buscarCedula(cedula) {
   try {
     const cedulaLimpia = cedula.trim().toUpperCase().replace(/\s+/g, "");
@@ -41,59 +52,38 @@ async function buscarCedula(cedula) {
       .single();
 
     if (error || !data) {
-      console.warn("🧐 No se encontró:", cedulaLimpia, error?.message);
+      console.warn("🧐 No encontrado:", cedulaLimpia, error?.message);
       return "🧐 No encontré información para esa cédula.";
     }
 
-    // Aquí va tu formato de respuesta con los datos encontrados
+    return `
+🆔 *Cédula:* ${data.cedula}
 
-    const genero = data.sexo === "F" ? "👩 FEMENINO" :
-                   data.sexo === "M" ? "👨 MASCULINO" : "⚧️ No definido";
+👤 *Nombre:* ${data.nombres_apelllidos_rep || "No registrado"}
+👫 *Sexo:* ${data.sexo || "No especificado"}
+💼 *Cargo:* ${data.cargo || "No registrado"} | *PBD:* ${data.tipo_pbd || "N/A"}
 
-    const tipo = {
-      D: "DOCENTE", A: "ADMINISTRATIVO", O: "APOYO", C: "COCINERA"
-    }[data.tipo_personal] || "Por definir";
+🏫 *Plantel:* ${data.nombre_plantel || "Desconocido"}
+📍 *Código DEA:* ${data.codigo_dea || "N/A"}
 
-    return `👤 ${data.nombre_apellido}
-    	👩‍💼 ${tipo} - ${genero}
-    	📌 Código RAC: ${data.codigo_rac || "N/D"}
-    	💼 Cargo: ${data.cargo || "N/D"}
-    	📅 Ingreso: ${data.fecha_ingreso || "Por definir"}
-    	📊 Servicio: ${data.a_servicio || 0} año(s), ${data.m_servicio || 0} mes(es)
-    	🏫 Plantel: ${data.nombre_plantel || "N/D"}
-    	📌 CV: ${data.cv || "Sin registro"}
-    	🗒️ Observación: ${data.observacion || "Sin detalles"}`;
-        } catch (err) {
-          console.error("❌ Error al consultar:", err);
-          return "❌ Ocurrió un error al procesar la cédula.";
-        }
-    }
-}
-    return `👤 ${data.nombre_apellido}\n📌 Cargo: ${data.cargo}\n🏫 Plantel: ${data.plantel}`;
+🗳️ *Centro de Votación:* ${data.cv || "No registrado"}
+📌 *Código CV:* ${data.cod_cv || "N/A"}
+
+🗓️ *Fecha de Ingreso:* ${data.fecha_ingreso || "No disponible"}
+⏳ *Tiempo de Servicio:* ${data.a_servicio || 0} años, ${data.m_servicio || 0} meses
+
+📚 *Horas Académicas:* ${data.horas_academicas || 0}
+🗂️ *Horas Administrativas:* ${data.horas_adm || 0}
+
+📌 *Situación Laboral:* ${data.situacion_trabajador || "No especificada"}
+📝 *Observación:* ${data.observacion || "Sin observaciones"}
+`;
   } catch (err) {
     console.error("❌ Error al consultar:", err);
     return "❌ Ocurrió un error al procesar la cédula.";
   }
 }
 
-  catch (err) {
-    console.error("❌ Error al consultar:", err);
-    return "❌ Ocurrió un error al procesar la cédula.";
-  }
-}
-
-// 📤 Enviar respuesta por Telegram
-async function enviarMensajeTelegram(chatId, texto) {
-  const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text: texto }),
-  });
-}
-
-// 🚀 Activar servidor
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Bot activo en puerto", PORT);
+  console.log(`🚀 Bot activo en puerto ${PORT}`);
 });
