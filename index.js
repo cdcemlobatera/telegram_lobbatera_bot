@@ -52,7 +52,7 @@ console.log("🔎 Buscando:", cedulaLimpia);
       .from("raclobatera")
       .select("*")
       .eq("cedula", cedulaLimpia)
-      .single();
+      .maybeSingle();
     
 console.log("📦 Resultado:", data);
 console.log("🐞 Error:", error);
