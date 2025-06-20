@@ -40,7 +40,7 @@ async function buscarCedula(cedula) {
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .eq("cedula", cedulaNum)
+      .eq("cedula", cedula.trim().toUpperCase())
       .single();
 
     if (error || !data) return "🧐 No encontré información para esa cédula.";
