@@ -69,7 +69,6 @@ async function buscarCedula(cedula) {
         }
     }
 }
-
     return `👤 ${data.nombre_apellido}\n📌 Cargo: ${data.cargo}\n🏫 Plantel: ${data.plantel}`;
   } catch (err) {
     console.error("❌ Error al consultar:", err);
