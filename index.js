@@ -32,20 +32,20 @@ app.post("/webhook", async (req, res) => {
 // 🔎 Buscar en Supabase
 async function buscarCedula(cedula) {
   try {
-    const cedulaLimpia = cedula.trim().replace(/\D/g, "");
-    const cedulaNum = parseInt(cedula.trim().replace(/\D/g, ""), 10);
-    
-    if (isNaN(cedulaNum)) return "⚠️ La cédula ingresada no es válida.";
+    const cedulaLimpia = cedula.trim().toUpperCase().replace(/\s+/g, "");
 
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .eq("cedula", cedula.trim().toUpperCase())
+      .eq("cedula", cedulaLimpia)
       .single();
 
-    if (error || !data) return "🧐 No encontré información para esa cédula.";
+    if (error || !data) {
+      console.warn("🧐 No se encontró:", cedulaLimpia, error?.message);
+      return "🧐 No encontré información para esa cédula.";
+    }
 
-    // ... tu bloque de respuesta formateado aquí ...
+    // Aquí va tu formato de respuesta con los datos encontrados
 
     const genero = data.sexo === "F" ? "👩 FEMENINO" :
                    data.sexo === "M" ? "👨 MASCULINO" : "⚧️ No definido";
@@ -55,15 +55,22 @@ async function buscarCedula(cedula) {
     }[data.tipo_personal] || "Por definir";
 
     return `👤 ${data.nombre_apellido}
-     👩‍💼 ${tipo} - ${genero}
-     📌 Código RAC: ${data.codigo_rac || "N/D"}
-     💼 Cargo: ${data.cargo || "N/D"}
-     📅 Ingreso: ${data.fecha_ingreso || "Por definir"}
-     📊 Antiguedad: ${data.a_servicio || 0} año(s), ${data.m_servicio || 0} mes(es)
-     🏫 Plantel: ${data.nombre_plantel || "N/D"}
-     📌 CV: ${data.cv || "Sin registro"}
-     🗒️ Observación: ${data.observacion || "Sin detalles"}`;
-   } catch (err) {
+    	👩‍💼 ${tipo} - ${genero}
+    	📌 Código RAC: ${data.codigo_rac || "N/D"}
+    	💼 Cargo: ${data.cargo || "N/D"}
+    	📅 Ingreso: ${data.fecha_ingreso || "Por definir"}
+    	📊 Servicio: ${data.a_servicio || 0} año(s), ${data.m_servicio || 0} mes(es)
+    	🏫 Plantel: ${data.nombre_plantel || "N/D"}
+    	📌 CV: ${data.cv || "Sin registro"}
+    	🗒️ Observación: ${data.observacion || "Sin detalles"}`;
+        } catch (err) {
+          console.error("❌ Error al consultar:", err);
+          return "❌ Ocurrió un error al procesar la cédula.";
+        }
+    }
+
+    return `👤 ${data.nombre_apellido}\n📌 Cargo: ${data.cargo}\n🏫 Plantel: ${data.plantel}`;
+  } catch (err) {
     console.error("❌ Error al consultar:", err);
     return "❌ Ocurrió un error al procesar la cédula.";
   }
