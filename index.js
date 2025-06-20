@@ -68,6 +68,7 @@ async function buscarCedula(cedula) {
           return "❌ Ocurrió un error al procesar la cédula.";
         }
     }
+}
 
     return `👤 ${data.nombre_apellido}\n📌 Cargo: ${data.cargo}\n🏫 Plantel: ${data.plantel}`;
   } catch (err) {
