@@ -69,7 +69,7 @@ async function buscarCedula(cedula) {
   }
 }
 
-  } catch (err) {
+  catch (err) {
     console.error("❌ Error al consultar:", err);
     return "❌ Ocurrió un error al procesar la cédula.";
   }
