@@ -47,12 +47,13 @@ async function buscarCedula(cedula) {
     const cedulaLimpia = cedula.trim().toUpperCase().replace(/\s+/g, "");
     
 console.log("🔎 Buscando:", cedulaLimpia);
+console.log("📌 CedulaLimpia bytes:", Array.from(cedulaLimpia).map(c => `${c}(${c.charCodeAt(0)})`));
     
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
       .eq("cedula", cedulaLimpia)
-      .maybeSingle();
+      .ilike("cedula", cedulaLimpia)
     
 console.log("📦 Resultado:", data);
 console.log("🐞 Error:", error);
