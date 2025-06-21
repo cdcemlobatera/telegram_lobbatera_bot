@@ -34,9 +34,12 @@ bot.on("text", async (ctx) => {
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .ilike("cedula", `%${cedulaLimpiada}%`)
+      .filter("cedula", "ilike", `%${cedulaLimpiada}%`)
       .limit(1);
 
+      if (data.length > 0) {
+        console.log("🎯 Coincidencia exacta:", data[0].cedula);
+      }
 
     console.log("📦 Resultado de Supabase:", data);
 
