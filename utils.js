@@ -31,11 +31,11 @@ function formatearRespuesta(data) {
 
   return `
 🆔 Cédula: ${data.cedula}
-
 👤 Nombre: ${data.nombresapellidosrep}
 👫 Género: ${genero}
-💼 Cargo: ${data.cargo} | Tipo de Personal: ${tipoPersonal}
+
 🔢 Código de Cargo: ${data.codigorac}
+💼 Cargo: ${data.cargo} | Tipo de Personal: ${tipoPersonal}
 
 🗓️ Fecha de Ingreso: ${fechaFormateada}
 ⏳ Tiempo de Servicio: ${anos} años, ${meses} meses
@@ -44,12 +44,9 @@ function formatearRespuesta(data) {
 🏢 Dependencia: ${data.codigodependencia}
 🏫 Plantel donde labora: ${data.nombreplantel}
 
-
 📌 Situación Laboral: ${data.situaciontrabajador}
 
-
 📝 Observación: ${data.observacion}
-
 
 🔖 Código Centro de Votación: ${data.codcenvot}
 🗳️ Ejerce el voto en: ${data.centrovotacion}
