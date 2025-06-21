@@ -1,16 +1,27 @@
 require("dotenv").config();
+const express = require("express");
 const { Telegraf } = require("telegraf");
 const { createClient } = require("@supabase/supabase-js");
 const { formatearRespuesta } = require("./utils");
-const http = require("http");
 
+const app = express();
+
+// Inicializar Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// Inicializar bot
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
+// Webhook path y configuración
+app.use(bot.webhookCallback("/bot"));
+bot.telegram.setWebhook(`${process.env.BASE_URL}/bot`); // Asegúrate de definir BASE_URL en .env
+
+// Comando /start
 bot.start((ctx) => {
   ctx.reply("👋 ¡Hola! Envíame una cédula como `V12345678` y te mostraré la ficha del trabajador.");
 });
 
+// Manejo de mensajes
 bot.on("text", async (ctx) => {
   try {
     const cedulaIngresada = ctx.message.text.trim().toUpperCase();
@@ -43,15 +54,12 @@ bot.on("text", async (ctx) => {
   }
 });
 
-bot.launch();
-console.log("🚀 Bot activo en puerto 10000");
-
+// Servidor web (Render requiere que se escuche en este puerto)
 const PORT = process.env.PORT || 10000;
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end("✅ Bot activo");
-}).listen(PORT, "0.0.0.0", () => {
-  console.log(`🌐 Puerto expuesto en ${PORT}`);
+app.get("/", (req, res) => res.send("✅ Bot activo"));
+app.listen(PORT, () => {
+  console.log(`🚀 Bot activo por webhook en puerto ${PORT}`);
+});
 });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
