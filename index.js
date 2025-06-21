@@ -66,23 +66,23 @@ console.log("🐞 Error:", error);
     return `
 🆔 *Cédula:* ${data.cedula}
 
-👤 *Nombre:* ${data.nombres_apelllidos_rep || "No registrado"}
+👤 *Nombre:* ${data.nombresapelllidosrep || "No registrado"}
 👫 *Sexo:* ${data.sexo || "No especificado"}
 💼 *Cargo:* ${data.cargo || "No registrado"} | *PBD:* ${data.tipo_pbd || "N/A"}
 
-🏫 *Plantel:* ${data.nombre_plantel || "Desconocido"}
+🏫 *Plantel:* ${data.nombreplantel || "Desconocido"}
 📍 *Código DEA:* ${data.codigo_dea || "N/A"}
 
-🗳️ *Centro de Votación:* ${data.cv || "No registrado"}
-📌 *Código CV:* ${data.cod_cv || "N/A"}
+🗳️ *Centro de Votación:* ${data.centrovotacion || "No registrado"}
+📌 *Código CV:* ${data.codcenvot || "N/A"}
 
-🗓️ *Fecha de Ingreso:* ${data.fecha_ingreso || "No disponible"}
-⏳ *Tiempo de Servicio:* ${data.a_servicio || 0} años, ${data.m_servicio || 0} meses
+🗓️ *Fecha de Ingreso:* ${data.fechaingreso || "No disponible"}
+⏳ *Tiempo de Servicio:* ${data.aservicio || 0} años, ${data.mservicio || 0} meses
 
-📚 *Horas Académicas:* ${data.horas_academicas || 0}
-🗂️ *Horas Administrativas:* ${data.horas_adm || 0}
+📚 *Horas Académicas:* ${data.horasacademicas || 0}
+🗂️ *Horas Administrativas:* ${data.horasadm || 0}
 
-📌 *Situación Laboral:* ${data.situacion_trabajador || "No especificada"}
+📌 *Situación Laboral:* ${data.situaciontrabajador || "No especificada"}
 📝 *Observación:* ${data.observacion || "Sin observaciones"}
 `;
   } catch (err) {
