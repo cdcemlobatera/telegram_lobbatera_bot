@@ -21,6 +21,14 @@ function formatearRespuesta(data) {
 
   const { anos, meses } = calcularTiempo(data.fechaingreso);
 
+  const fechaFormateada = data.fechaingreso
+    ? new Date(data.fechaingreso).toLocaleDateString("es-VE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      })
+    : "NA";
+
   return `
 🆔 Cédula: ${data.cedula}
 
@@ -29,15 +37,16 @@ function formatearRespuesta(data) {
 💼 Cargo: ${data.cargo} | Tipo de Personal: ${tipoPersonal}
 🔢 Código de Cargo: ${data.codigorac}
 
-🗓️ Fecha de Ingreso: ${data.fechaingreso}
+🗓️ Fecha de Ingreso: ${fechaFormateada}
 ⏳ Tiempo de Servicio: ${anos} años, ${meses} meses
-📊 Meses de Servicio Declarados: ${data.mservicio}
 
-🏫 Plantel: ${data.nombreplantel}
 📌 Código DEA: ${data.codigodea}
 🏢 Dependencia: ${data.codigodependencia}
+🏫 Plantel: ${data.nombreplantel}
+
 
 📌 Situación Laboral: ${data.situaciontrabajador}
+
 📝 Observación: ${data.observacion}
 
 🗳️ Centro de Votación: ${data.centrovotacion}
