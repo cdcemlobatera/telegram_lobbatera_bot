@@ -4,26 +4,17 @@ const { createClient } = require("@supabase/supabase-js");
 const { formatearRespuesta } = require("./utils");
 const http = require("http");
 
-// Inicializar Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// Inicializar bot
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
-// Comando /start
 bot.start((ctx) => {
   ctx.reply("👋 ¡Hola! Envíame una cédula como `V12345678` y te mostraré la ficha del trabajador.");
 });
-
-// Escuchar mensajes
 
 bot.on("text", async (ctx) => {
   try {
     const cedulaIngresada = ctx.message.text.trim().toUpperCase();
     const cedulaLimpiada = cedulaIngresada.replace(/\s/g, "");
-
-    console.log("📩 Mensaje recibido:", cedulaIngresada);
-    console.log("🆔 Cedula limpia:", JSON.stringify(cedulaLimpiada));
 
     if (!/^V\d{7,8}$/.test(cedulaLimpiada)) {
       return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
@@ -34,8 +25,6 @@ bot.on("text", async (ctx) => {
       .select("*")
       .eq("cedula", cedulaLimpiada)
       .limit(1);
-
-    console.log("📦 Resultado de Supabase:", data);
 
     if (error) {
       console.error("❌ Error Supabase:", error);
@@ -54,11 +43,9 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// Lanzar bot
 bot.launch();
 console.log("🚀 Bot activo en puerto 10000");
 
-// Exponer puerto para Render
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
   res.writeHead(200);
@@ -67,6 +54,5 @@ http.createServer((req, res) => {
   console.log(`🌐 Puerto expuesto en ${PORT}`);
 });
 
-// Manejo de cierre
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
