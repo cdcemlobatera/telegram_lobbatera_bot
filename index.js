@@ -17,32 +17,31 @@ bot.start((ctx) => {
 
 // Escuchar mensajes
 bot.on("text", async (ctx) => {
-  const cedula = ctx.message.text.trim().toUpperCase();
-  
-  console.log("📩 Mensaje recibido:", cedula); // <-- Verifica si el bot recibe el mensaje
+  const cedulaIngresada = ctx.message.text.trim().toUpperCase();
+  const cedulaLimpiada = cedulaIngresada.replace(/\s/g, "");
 
-  if (!/^V\d{7,8}$/.test(cedula)) {
+  console.log("📩 Mensaje recibido:", cedulaIngresada);
+  console.log("🆔 Cedula limpia:", JSON.stringify(cedulaLimpiada));
+
+  // Validación básica del formato
+  if (!/^V\d{7,8}$/.test(cedulaLimpiada)) {
     return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
   }
 
   try {
-    console.log("🔎 Buscando en Supabase:", cedula); // <-- Verifica si la consulta se ejecuta
+    console.log("🔎 Buscando en Supabase:", cedulaLimpiada);
 
-    const cedulaLimpiada = cedula.replace(/\s/g, "").toUpperCase();
-    
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
       .eq("cedula", cedulaLimpiada)
       .limit(1);
 
-    console.log("🆔 Cedula buscada:", JSON.stringify(cedulaLimpiada));
-
-    console.log("📦 Resultado de Supabase:", data); // <-- Verifica si Supabase devuelve datos
+    console.log("📦 Resultado de Supabase:", data);
 
     if (error) {
       console.error("❌ Error Supabase:", error);
-      return ctx.reply("🚨 Error al consultar la base de datos.");
+      return ctx.reply("🚨 Ocurrió un error al consultar la base de datos.");
     }
 
     if (!data || data.length === 0) {
