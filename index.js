@@ -18,25 +18,27 @@ bot.start((ctx) => {
 // Escuchar mensajes
 bot.on("text", async (ctx) => {
   const cedula = ctx.message.text.trim().toUpperCase();
+  
+  console.log("📩 Mensaje recibido:", cedula); // <-- Verifica si el bot recibe el mensaje
 
   if (!/^V\d{7,8}$/.test(cedula)) {
     return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
   }
 
   try {
-    console.log("🔎 Buscando:", cedula);
+    console.log("🔎 Buscando en Supabase:", cedula); // <-- Verifica si la consulta se ejecuta
 
-  const { data, error } = await supabase
-    .from("raclobatera")
-    .select("*")
-    .ilike("cedula", cedula)
-    .limit(1);
-  
-  console.log("📦 Resultado:", data);
+    const { data, error } = await supabase
+      .from("raclobatera")
+      .select("*")
+      .ilike("cedula", cedula)
+      .limit(1);
+
+    console.log("📦 Resultado de Supabase:", data); // <-- Verifica si Supabase devuelve datos
 
     if (error) {
       console.error("❌ Error Supabase:", error);
-      return ctx.reply("🚨 Ocurrió un error al consultar la base de datos.");
+      return ctx.reply("🚨 Error al consultar la base de datos.");
     }
 
     if (!data || data.length === 0) {
