@@ -52,7 +52,7 @@ function formatearRespuesta(data) {
 
 
 🔖 Código Centro de Votación: ${data.codcenvot}
-🗳️ INstitución donde ejerce el voto: ${data.centrovotacion}
+🗳️ Ejerce el voto en: ${data.centrovotacion}
 
 `.trim();
 }
