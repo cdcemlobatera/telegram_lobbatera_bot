@@ -28,11 +28,15 @@ bot.on("text", async (ctx) => {
   try {
     console.log("🔎 Buscando en Supabase:", cedula); // <-- Verifica si la consulta se ejecuta
 
+    const cedulaLimpiada = cedula.replace(/\s/g, "").toUpperCase();
+    
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .ilike("cedula", cedula)
+      .eq("cedula", cedulaLimpiada)
       .limit(1);
+
+    console.log("🆔 Cedula buscada:", JSON.stringify(cedulaLimpiada));
 
     console.log("📦 Resultado de Supabase:", data); // <-- Verifica si Supabase devuelve datos
 
