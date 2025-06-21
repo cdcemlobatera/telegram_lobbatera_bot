@@ -60,7 +60,6 @@ app.get("/", (req, res) => res.send("✅ Bot activo"));
 app.listen(PORT, () => {
   console.log(`🚀 Bot activo por webhook en puerto ${PORT}`);
 });
-});
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
