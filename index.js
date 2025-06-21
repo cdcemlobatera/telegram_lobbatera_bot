@@ -1,96 +1,58 @@
-const express = require("express");
-const TelegramBot = require("node-telegram-bot-api");
+require("dotenv").config();
+const { Telegraf } = require("telegraf");
 const { createClient } = require("@supabase/supabase-js");
-const dotenv = require("dotenv");
+const { formatearRespuesta } = require("./utils");
 
-dotenv.config();
+// Inicializar Supabase
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+// Inicializar bot
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
-// Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
-
-// Telegram
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN);
-bot.setWebHook(`${process.env.RENDER_EXTERNAL_URL}/bot${process.env.TELEGRAM_TOKEN}`);
-
-// Webhook endpoint
-app.post(`/bot${process.env.TELEGRAM_TOKEN}`, express.json(), (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
+// Comando /start
+bot.start((ctx) => {
+  ctx.reply("👋 ¡Hola! Envíame una cédula como `V12345678` y te mostraré la ficha del trabajador.");
 });
 
-// Ping para monitoreo
-app.get("/ping", (req, res) => {
-  const now = new Date().toLocaleString("es-VE", { timeZone: "America/Caracas" });
-  res.send(`✅ Bot activo - ${now}`);
-});
+// Escuchar mensajes de texto
+bot.on("text", async (ctx) => {
+  const cedula = ctx.message.text.trim().toUpperCase();
 
-// Manejo de mensajes
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const cedula = msg.text;
+  // Validar formato
+  if (!/^V\d{7,8}$/.test(cedula)) {
+    return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
+  }
 
-  if (!cedula) return;
-
-  const respuesta = await buscarCedula(cedula);
-  bot.sendMessage(chatId, respuesta, { parse_mode: "Markdown" });
-});
-
-// Función de búsqueda
-async function buscarCedula(cedula) {
   try {
-    const cedulaLimpia = cedula.trim().toUpperCase().replace(/\s+/g, "");
-    
-console.log("🔎 Buscando:", cedulaLimpia);
-console.log("📌 CedulaLimpia bytes:", Array.from(cedulaLimpia).map(c => `${c}(${c.charCodeAt(0)})`));
-    
+    console.log("🔎 Buscando:", cedula);
+
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .eq("cedula", cedulaLimpia)
-      .ilike("cedula", cedulaLimpia)
-    
-console.log("📦 Resultado:", data);
-console.log("🐞 Error:", error);
+      .ilike("cedula", cedula)
+      .limit(1);
 
-    if (error || !data) {
-      console.warn("🧐 No encontrado:", cedulaLimpia, error?.message);
-      return "🧐 No encontré información para esa cédula.";
+    if (error) {
+      console.error("❌ Error Supabase:", error);
+      return ctx.reply("🚨 Ocurrió un error al consultar la base de datos.");
     }
 
-    return `
-🆔 *Cédula:* ${data.cedula}
+    if (!data || data.length === 0) {
+      return ctx.reply("🧐 No encontré información para esa cédula.");
+    }
 
-👤 *Nombre:* ${data.nombresapelllidosrep || "No registrado"}
-👫 *Sexo:* ${data.sexo || "No especificado"}
-💼 *Cargo:* ${data.cargo || "No registrado"} | *PBD:* ${data.tipo_pbd || "N/A"}
-
-🏫 *Plantel:* ${data.nombreplantel || "Desconocido"}
-📍 *Código DEA:* ${data.codigo_dea || "N/A"}
-
-🗳️ *Centro de Votación:* ${data.centrovotacion || "No registrado"}
-📌 *Código CV:* ${data.codcenvot || "N/A"}
-
-🗓️ *Fecha de Ingreso:* ${data.fechaingreso || "No disponible"}
-⏳ *Tiempo de Servicio:* ${data.aservicio || 0} años, ${data.mservicio || 0} meses
-
-📚 *Horas Académicas:* ${data.horasacademicas || 0}
-🗂️ *Horas Administrativas:* ${data.horasadm || 0}
-
-📌 *Situación Laboral:* ${data.situaciontrabajador || "No especificada"}
-📝 *Observación:* ${data.observacion || "Sin observaciones"}
-`;
+    const respuesta = formatearRespuesta(data[0]);
+    ctx.reply(respuesta);
   } catch (err) {
-    console.error("❌ Error al consultar:", err);
-    return "❌ Ocurrió un error al procesar la cédula.";
+    console.error("❌ Error general:", err);
+    ctx.reply("⚠️ Algo salió mal. Intenta de nuevo más tarde.");
   }
-}
-
-app.listen(PORT, () => {
-  console.log(`🚀 Bot activo en puerto ${PORT}`);
 });
+
+// Iniciar bot
+bot.launch();
+console.log("🚀 Bot activo en puerto 10000");
+
+// Manejo de cierre
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
