@@ -2,6 +2,7 @@ require("dotenv").config();
 const { Telegraf } = require("telegraf");
 const { createClient } = require("@supabase/supabase-js");
 const { formatearRespuesta } = require("./utils");
+const http = require("http");
 
 // Inicializar Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -14,11 +15,10 @@ bot.start((ctx) => {
   ctx.reply("👋 ¡Hola! Envíame una cédula como `V12345678` y te mostraré la ficha del trabajador.");
 });
 
-// Escuchar mensajes de texto
+// Escuchar mensajes
 bot.on("text", async (ctx) => {
   const cedula = ctx.message.text.trim().toUpperCase();
 
-  // Validar formato
   if (!/^V\d{7,8}$/.test(cedula)) {
     return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
   }
@@ -49,9 +49,18 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// Iniciar bot
+// Lanzar bot
 bot.launch();
 console.log("🚀 Bot activo en puerto 10000");
+
+// Exponer puerto para Render
+const PORT = process.env.PORT || 10000;
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("✅ Bot activo");
+}).listen(PORT, "0.0.0.0", () => {
+  console.log(`🌐 Puerto expuesto en ${PORT}`);
+});
 
 // Manejo de cierre
 process.once("SIGINT", () => bot.stop("SIGINT"));
