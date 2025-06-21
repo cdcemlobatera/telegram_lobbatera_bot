@@ -49,8 +49,9 @@ function formatearRespuesta(data) {
 
 📝 Observación: ${data.observacion}
 
-🗳️ Centro de Votación: ${data.centrovotacion}
-🔖 Código CENVOT: ${data.codcenvot}
+🔖 Código Centro de Votación: ${data.codcenvot}
+🗳️ INstitución donde ejerce el voto: ${data.centrovotacion}
+
 `.trim();
 }
 
