@@ -16,49 +16,41 @@ bot.start((ctx) => {
 });
 
 // Escuchar mensajes
+
 bot.on("text", async (ctx) => {
-  const cedulaIngresada = ctx.message.text.trim().toUpperCase();
-  const cedulaLimpiada = cedulaIngresada.replace(/\s/g, "");
-
-  console.log("📩 Mensaje recibido:", cedulaIngresada);
-  console.log("🆔 Cedula limpia:", JSON.stringify(cedulaLimpiada));
-
-  // Validación básica del formato
-  if (!/^V\d{7,8}$/.test(cedulaLimpiada)) {
-    return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
-  }
-
   try {
-    console.log("🔎 Buscando en Supabase:", cedulaLimpiada);
+    const cedulaIngresada = ctx.message.text.trim().toUpperCase();
+    const cedulaLimpiada = cedulaIngresada.replace(/\s/g, "");
+
+    console.log("📩 Mensaje recibido:", cedulaIngresada);
+    console.log("🆔 Cedula limpia:", JSON.stringify(cedulaLimpiada));
+
+    if (!/^V\d{7,8}$/.test(cedulaLimpiada)) {
+      return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: `V12345678`");
+    }
 
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .filter("cedula", "ilike", `%${cedulaLimpiada}%`)
+      .eq("cedula", cedulaLimpiada)
       .limit(1);
-
-      if (data.length > 0) {
-        console.log("🎯 Coincidencia exacta:", data[0].cedula);
-      }
 
     console.log("📦 Resultado de Supabase:", data);
 
     if (error) {
       console.error("❌ Error Supabase:", error);
-      return ctx.reply("🚨 Ocurrió un error al consultar la base de datos.");
+      return ctx.reply("🚨 Error al consultar la base de datos.");
     }
 
     if (!data || data.length === 0) {
       return ctx.reply("🧐 No encontré información para esa cédula.");
     }
 
-    console.log("📋 Cedula en DB:", data[0].cedula, "| Cedula buscada:", cedulaLimpiada);
-    
     const respuesta = formatearRespuesta(data[0]);
     ctx.reply(respuesta);
   } catch (err) {
-    console.error("❌ Error general:", err);
-    ctx.reply("⚠️ Algo salió mal. Intenta de nuevo más tarde.");
+    console.error("❌ Error inesperado:", err);
+    ctx.reply("⚠️ Ocurrió un error inesperado. Revisa los logs.");
   }
 });
 
