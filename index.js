@@ -26,11 +26,13 @@ bot.on("text", async (ctx) => {
   try {
     console.log("🔎 Buscando:", cedula);
 
-    const { data, error } = await supabase
-      .from("raclobatera")
-      .select("*")
-      .ilike("cedula", cedula)
-      .limit(1);
+  const { data, error } = await supabase
+    .from("raclobatera")
+    .select("*")
+    .ilike("cedula", cedula)
+    .limit(1);
+  
+  console.log("📦 Resultado:", data);
 
     if (error) {
       console.error("❌ Error Supabase:", error);
