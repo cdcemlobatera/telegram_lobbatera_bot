@@ -34,8 +34,9 @@ bot.on("text", async (ctx) => {
     const { data, error } = await supabase
       .from("raclobatera")
       .select("*")
-      .eq("cedula", cedulaLimpiada)
+      .ilike("cedula", `%${cedulaLimpiada}%`)
       .limit(1);
+
 
     console.log("📦 Resultado de Supabase:", data);
 
@@ -48,6 +49,8 @@ bot.on("text", async (ctx) => {
       return ctx.reply("🧐 No encontré información para esa cédula.");
     }
 
+    console.log("📋 Cedula en DB:", data[0].cedula, "| Cedula buscada:", cedulaLimpiada);
+    
     const respuesta = formatearRespuesta(data[0]);
     ctx.reply(respuesta);
   } catch (err) {
