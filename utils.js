@@ -50,7 +50,6 @@ function formatearRespuesta(data) {
 
 🔖 Código Centro de Votación: ${data.codcenvot}
 🗳️ Ejerce el voto en: ${data.centrovotacion}
-
 `.trim();
 }
 
