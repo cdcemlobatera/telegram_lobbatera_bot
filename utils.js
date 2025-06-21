@@ -42,12 +42,14 @@ function formatearRespuesta(data) {
 
 📌 Código DEA: ${data.codigodea}
 🏢 Dependencia: ${data.codigodependencia}
-🏫 Plantel: ${data.nombreplantel}
+🏫 Plantel donde labora: ${data.nombreplantel}
 
 
 📌 Situación Laboral: ${data.situaciontrabajador}
 
+
 📝 Observación: ${data.observacion}
+
 
 🔖 Código Centro de Votación: ${data.codcenvot}
 🗳️ INstitución donde ejerce el voto: ${data.centrovotacion}
