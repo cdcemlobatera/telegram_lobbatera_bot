@@ -44,3 +44,5 @@ function formatearRespuesta(data) {
 🔖 Código CENVOT: ${data.codcenvot}
 `.trim();
 }
+
+module.exports = { formatearRespuesta, calcularTiempo };
