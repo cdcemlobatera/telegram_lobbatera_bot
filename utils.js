@@ -46,6 +46,9 @@ function formatearRespuesta(data) {
 
 📌 Situación Laboral: ${data.situaciontrabajador}
 
+🕰️ Horas Académicas: ${data.horasacademicas}
+⏱️ Horas Administrativas: ${data.horasadm}
+
 📝 Observación: ${data.observacion}
 
 🔖 Código Centro de Votación: ${data.codcenvot}
