@@ -3,8 +3,29 @@ const express = require("express");
 const { Telegraf } = require("telegraf");
 const { createClient } = require("@supabase/supabase-js");
 const { formatearRespuesta } = require("./utils");
-
 const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (_req, res) => {
+  res.send('✅ Bot activo y escuchando desde Express');
+});
+
+// Tu código de Telegraf debe estar después de esto
+const { Telegraf } = require('telegraf');
+require('dotenv').config();
+
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+
+// Opcional: elimina o comenta esta línea si da error mientras pruebas
+// await bot.telegram.setWebhook(`${process.env.BASE_URL}/bot${process.env.TELEGRAM_TOKEN}`);
+
+// Si usas webhook:
+app.use(bot.webhookCallback(`/bot${process.env.TELEGRAM_TOKEN}`));
+
+// Inicia Express
+app.listen(port, () => {
+  console.log(`🚀 Bot activo en puerto ${port}`);
+});
 
 // Inicializar Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
