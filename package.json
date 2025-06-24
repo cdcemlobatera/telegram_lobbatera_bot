@@ -18,4 +18,8 @@
   "keywords": [],
   "author": "Oxiel",
   "license": "MIT"
+
+  "dependencies": {
+      "ws": "^8.0.0"
+    }
 }
