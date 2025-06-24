@@ -29,9 +29,6 @@ app.listen(port, () => {
 // Inicializar Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Inicializar bot
-const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-
 // Webhook path y configuración
 app.use(bot.webhookCallback("/bot"));
 bot.telegram.setWebhook(`${process.env.BASE_URL}/bot`); // Asegúrate de definir BASE_URL en .env
