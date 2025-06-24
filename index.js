@@ -1,6 +1,5 @@
 require("dotenv").config();
 const express = require("express");
-const { Telegraf } = require("telegraf");
 const { createClient } = require("@supabase/supabase-js");
 const { formatearRespuesta } = require("./utils");
 const app = express();
