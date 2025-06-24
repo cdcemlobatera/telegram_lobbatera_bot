@@ -9,6 +9,6 @@
     "telegraf": "^4.12.2",
     "ws": "^8.13.0",
     "dotenv": "^16.3.1",
-    "supabase": "^2.39.5"
+    "@supabase/supabase-js": "^2.39.5"
   }
 }
