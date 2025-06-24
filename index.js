@@ -22,9 +22,9 @@ const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 app.use(bot.webhookCallback(`/bot${process.env.TELEGRAM_TOKEN}`));
 
 // Inicia Express
-app.listen(port, () => {
-  console.log(`🚀 Bot activo en puerto ${port}`);
-});
+//app.listen(port, () => {
+//  console.log(`🚀 Bot activo en puerto ${port}`);
+//});
 
 // Inicializar Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
