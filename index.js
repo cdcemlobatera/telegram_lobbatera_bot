@@ -5,10 +5,6 @@ const { formatearRespuesta } = require("./utils");
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.get('/', (_req, res) => {
-  res.send('✅ Bot activo y escuchando desde Express');
-});
-
 // Tu código de Telegraf debe estar después de esto
 const { Telegraf } = require('telegraf');
 require('dotenv').config();
