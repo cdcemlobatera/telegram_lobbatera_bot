@@ -7,19 +7,16 @@ const { formatearRespuesta } = require("./utils");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cliente Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// Crear instancia del bot
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
-// Configurar Webhook en Render
+// Webhook en Render
 bot.telegram.setWebhook(`${process.env.BASE_URL}/bot`);
 app.use(bot.webhookCallback("/bot"));
 
-app.get("/", (req, res) => res.send("✅ Bot activo y escuchando en webhook"));
+app.get("/", (req, res) => res.send("✅ Bot activo y escuchando"));
 
-//lote 2
+//Lote 2
 
 bot.start((ctx) => {
   ctx.reply("👋 ¡Hola! Envíame tu cédula en formato `V12345678` para consultar tu ficha y registrar tu participación.", {
@@ -36,18 +33,17 @@ bot.on("text", async (ctx) => {
   }
 
   // Buscar ficha institucional
-  const { data, error } = await supabase
+  const { data: persona, error } = await supabase
     .from("raclobatera")
     .select("*")
     .eq("cedula", cedulaIngresada)
     .maybeSingle();
 
-  if (error || !data) {
+  if (error || !persona) {
     return ctx.reply("🧐 No encontré información para esa cédula.");
   }
 
-  // Mostrar ficha institucional
-  await ctx.reply(formatearRespuesta(data));
+  await ctx.reply(formatearRespuesta(persona));
 
   // Verificar convocatoria activa
   const { data: convocatoriaActiva } = await supabase
@@ -68,7 +64,6 @@ bot.on("text", async (ctx) => {
     .maybeSingle();
 
   if (convocatoriaActiva && !yaAsistio) {
-    // Si ya confirmó
     const { data: yaConfirmo } = await supabase
       .from("confirmaciones")
       .select("*")
@@ -78,17 +73,16 @@ bot.on("text", async (ctx) => {
       .maybeSingle();
 
     if (yaConfirmo) {
-      return ctx.reply(`📌 *${convocatoriaActiva.titulo}*\nConfirmaste tu participación.\n¿Deseas registrar tu asistencia ahora?`, {
+      await ctx.reply(`🗓️ Ya confirmaste tu participación en: *${convocatoriaActiva.titulo}*\n¿Deseas registrar tu asistencia ahora?`, {
         parse_mode: "Markdown",
         reply_markup: {
-          inline_keyboard: [[{
-            text: "✅ Registrar asistencia ahora",
-            callback_data: `asistir_${convocatoriaId}_${cedulaIngresada}`
-          }]]
+          inline_keyboard: [
+            [{ text: "✅ Registrar asistencia ahora", callback_data: `asistir_${convocatoriaId}_${cedulaIngresada}` }]
+          ]
         }
       });
     } else {
-      return ctx.reply(`📢 *${convocatoriaActiva.titulo}*\n¿Confirmas tu participación?`, {
+      await ctx.reply(`📢 *${convocatoriaActiva.titulo}*\n¿Confirmas tu participación?`, {
         parse_mode: "Markdown",
         reply_markup: {
           inline_keyboard: [
@@ -102,44 +96,48 @@ bot.on("text", async (ctx) => {
     }
   }
 
-  // 🧩 Lógica de motivos (ajustada del LOTE 5)
-  const motivoRegistrado = yaAsistio?.motivo;
-  const listaMotivos = [
-    "Reunión Pedagógica",
-    "Consejo de Sección",
-    "Solicitud de Constancia",
-    "Contacto con CDCE",
-    "Asistencia General"
-  ];
+  // Mostrar menú de motivos si no ha asistido aún
+  if (!yaAsistio) {
+    const motivos = [
+      "Reunión Pedagógica",
+      "Consejo de Sección",
+      "Solicitud de Constancia",
+      "Contacto con CDCE",
+      "Asistencia General"
+    ];
 
-  if (motivoRegistrado) {
-    const motivosRestantes = listaMotivos.filter(m => m !== motivoRegistrado);
-
-    if (motivosRestantes.length === 0) {
-      return ctx.reply(`✅ Ya registraste tu participación hoy con motivo: *${motivoRegistrado}*`, {
-        parse_mode: "Markdown"
-      });
-    }
-
-    const botones = motivosRestantes.map(m => [{
-      text: `📌 ${m}`,
-      callback_data: `motivo_${m}_${cedulaIngresada}`
-    }]);
-
-    return ctx.reply("¿Deseas registrar otro motivo adicional para hoy?", {
-      reply_markup: { inline_keyboard: botones }
-    });
-  } else {
-    // No hay motivo aún → mostrar todos
-    const botones = listaMotivos.map(m => [{
-      text: `📌 ${m}`,
-      callback_data: `motivo_${m}_${cedulaIngresada}`
-    }]);
+    const botones = motivos.map((m) => [
+      { text: `📌 ${m}`, callback_data: `motivo_${m}_${cedulaIngresada}` }
+    ]);
 
     return ctx.reply("Selecciona tu motivo de participación para hoy 👇", {
       reply_markup: { inline_keyboard: botones }
     });
   }
+
+  // Si ya asistió, mostrar motivo (y omitir botón si ya no quedan motivos)
+  const motivoRegistrado = yaAsistio?.motivo;
+  const restantes = [
+    "Reunión Pedagógica",
+    "Consejo de Sección",
+    "Solicitud de Constancia",
+    "Contacto con CDCE",
+    "Asistencia General"
+  ].filter((m) => m !== motivoRegistrado);
+
+  if (restantes.length === 0) {
+    return ctx.reply(`✅ Ya registraste tu participación con motivo: *${motivoRegistrado}*`, {
+      parse_mode: "Markdown"
+    });
+  }
+
+  const nuevosBotones = restantes.map((m) => [
+    { text: `📌 ${m}`, callback_data: `motivo_${m}_${cedulaIngresada}` }
+  ]);
+
+  return ctx.reply("¿Deseas agregar otro motivo adicional para hoy?", {
+    reply_markup: { inline_keyboard: nuevosBotones }
+  });
 });
 
 //lote 3
@@ -148,7 +146,7 @@ bot.on("callback_query", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
   const hoy = new Date().toISOString().split("T")[0];
 
-  // ✅ Confirmaciones de convocatoria
+  // 📌 Confirmación de convocatoria
   if (callbackData.startsWith("confirmar_")) {
     const [, decision, convocatoriaId, cedula] = callbackData.split("_");
 
@@ -166,13 +164,13 @@ bot.on("callback_query", async (ctx) => {
     );
   }
 
-  // 🕹️ Asistencia directa tras confirmar
+  // ✅ Registro directo de asistencia
   if (callbackData.startsWith("asistir_")) {
     const [, convocatoriaId, cedula] = callbackData.split("_");
 
     const { data: yaAsistio } = await supabase
       .from("asistencia")
-      .select("*")
+      .select("id")
       .eq("cedula", cedula)
       .eq("fecha", hoy)
       .eq("convocatoria_id", convocatoriaId);
@@ -198,7 +196,7 @@ bot.on("callback_query", async (ctx) => {
     return ctx.reply("✅ Asistencia registrada correctamente. ¡Gracias por tu participación!");
   }
 
-  // 🎯 Motivo de participación
+  // 🧠 Registro de motivo (evita duplicados)
   if (callbackData.startsWith("motivo_")) {
     const [_, motivo, cedula] = callbackData.split("_");
 
@@ -225,7 +223,7 @@ bot.on("callback_query", async (ctx) => {
       .eq("activa", true)
       .maybeSingle();
 
-    const nuevo = {
+    const nuevoRegistro = {
       cedula,
       fecha: hoy,
       registrado_en: new Date().toISOString(),
@@ -233,10 +231,10 @@ bot.on("callback_query", async (ctx) => {
       convocatoria_id: convocatoria?.id || null
     };
 
-    const { error } = await supabase.from("asistencia").insert(nuevo);
+    const { error } = await supabase.from("asistencia").insert(nuevoRegistro);
     if (error) {
-      console.error("❌ Error al guardar motivo:", error);
-      return ctx.reply("🚫 Hubo un error al registrar tu participación.");
+      console.error("❌ Error al registrar motivo:", error);
+      return ctx.reply("🚫 Hubo un error al guardar tu participación.");
     }
 
     return ctx.reply(`✅ Asistencia registrada con motivo: *${motivo}*`, {
@@ -245,13 +243,13 @@ bot.on("callback_query", async (ctx) => {
   }
 });
 
-//Lote 4
+// lote 4
 
-// Iniciar servidor en puerto asignado (útil en Render)
+// Iniciar servidor Express en el puerto asignado por Render
 app.listen(PORT, () => {
-  console.log(`🚀 Bot escuchando vía webhook en puerto ${PORT}`);
+  console.log(`🚀 Bot desplegado y escuchando en puerto ${PORT}`);
 });
 
-// Apagado limpio del bot
+// Detención limpia del bot en caso de señales del sistema
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
