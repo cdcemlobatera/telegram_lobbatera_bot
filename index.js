@@ -54,7 +54,7 @@ bot.on("text", async (ctx) => {
   await ctx.reply(respuesta);
 
   // Pregunta de asistencia
-  await ctx.reply("¿Deseas registrar tu asistencia para hoy?", {
+  await ctx.reply("¿Deseas registrar la asistencia para hoy?", {
     reply_markup: {
       inline_keyboard: [
         [
