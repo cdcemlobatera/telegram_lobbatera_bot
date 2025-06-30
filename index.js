@@ -84,18 +84,28 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("🔁 Ya has registrado tu asistencia para hoy.");
     }
 
+  try {
     const { error: insertError } = await supabase
-      .from("asistencia") // ✅ correcto
+      .from("asistencia")
       .insert({
         cedula,
         fecha: hoy,
         registrado_en: new Date().toISOString()
       });
-
+  
     if (insertError) {
-      console.error("❌ Error al insertar asistencia:", insertError);
-      return ctx.reply("🚫 Hubo un problema al registrar tu asistencia.");
+      console.error("❌ Error Supabase al insertar asistencia:");
+      console.error("Mensaje:", insertError.message);
+      console.error("Detalles:", insertError.details);
+      console.error("Pista:", insertError.hint);
+      return ctx.reply("🚫 Hubo un problema técnico al registrar tu asistencia.");
     }
+  
+    return ctx.reply("✅ Asistencia registrada con éxito. ¡Gracias!");
+  } catch (err) {
+    console.error("🔥 Excepción inesperada:", err);
+    return ctx.reply("🚨 Fallo inesperado al registrar. Notifica al administrador.");
+  }
 
     return ctx.reply("✅ Asistencia registrada con éxito. ¡Gracias por participar!");
   }
