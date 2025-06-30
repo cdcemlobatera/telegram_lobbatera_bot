@@ -10,11 +10,10 @@ const PORT = process.env.PORT || 3000;
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
-// Webhook en Render
 bot.telegram.setWebhook(`${process.env.BASE_URL}/bot`);
 app.use(bot.webhookCallback("/bot"));
 
-app.get("/", (req, res) => res.send("✅ Bot activo y escuchando"));
+app.get("/", (req, res) => res.send("✅ Bot operativo y escuchando correctamente"));
 
 //Lote 2
 
@@ -32,7 +31,6 @@ bot.on("text", async (ctx) => {
     return ctx.reply("⚠️ Cédula inválida. Ejemplo válido: V12345678");
   }
 
-  // Buscar ficha institucional
   const { data: persona, error } = await supabase
     .from("raclobatera")
     .select("*")
@@ -45,7 +43,6 @@ bot.on("text", async (ctx) => {
 
   await ctx.reply(formatearRespuesta(persona));
 
-  // Verificar convocatoria activa
   const { data: convocatoriaActiva } = await supabase
     .from("convocatorias")
     .select("*")
@@ -55,7 +52,6 @@ bot.on("text", async (ctx) => {
 
   const convocatoriaId = convocatoriaActiva?.id;
 
-  // Verificar asistencia previa
   const { data: yaAsistio } = await supabase
     .from("asistencia")
     .select("*")
@@ -96,7 +92,7 @@ bot.on("text", async (ctx) => {
     }
   }
 
-  // Mostrar menú de motivos si no ha asistido aún
+  // Si no ha registrado asistencia, mostrar todos los motivos
   if (!yaAsistio) {
     const motivos = [
       "Reunión Pedagógica",
@@ -115,9 +111,9 @@ bot.on("text", async (ctx) => {
     });
   }
 
-  // Si ya asistió, mostrar motivo (y omitir botón si ya no quedan motivos)
+  // Si ya asistió, mostrar solo motivos que no se hayan registrado
   const motivoRegistrado = yaAsistio?.motivo;
-  const restantes = [
+  const motivosRestantes = [
     "Reunión Pedagógica",
     "Consejo de Sección",
     "Solicitud de Constancia",
@@ -125,30 +121,32 @@ bot.on("text", async (ctx) => {
     "Asistencia General"
   ].filter((m) => m !== motivoRegistrado);
 
-  if (restantes.length === 0) {
+  if (motivosRestantes.length === 0) {
     return ctx.reply(`✅ Ya registraste tu participación con motivo: *${motivoRegistrado}*`, {
       parse_mode: "Markdown"
     });
   }
 
-  const nuevosBotones = restantes.map((m) => [
+  const botonesExtra = motivosRestantes.map((m) => [
     { text: `📌 ${m}`, callback_data: `motivo_${m}_${cedulaIngresada}` }
   ]);
 
   return ctx.reply("¿Deseas agregar otro motivo adicional para hoy?", {
-    reply_markup: { inline_keyboard: nuevosBotones }
+    reply_markup: { inline_keyboard: botonesExtra }
   });
 });
 
-//lote 3
+//Lote 3
 
 bot.on("callback_query", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 📌 Confirmación de convocatoria
+  // ✅ Confirmaciones de convocatoria
   if (callbackData.startsWith("confirmar_")) {
     const [, decision, convocatoriaId, cedula] = callbackData.split("_");
+
+    await ctx.editMessageReplyMarkup(null); // 🔐 Eliminar botones visibles
 
     await supabase.from("confirmaciones").insert({
       cedula,
@@ -164,7 +162,7 @@ bot.on("callback_query", async (ctx) => {
     );
   }
 
-  // ✅ Registro directo de asistencia
+  // 📍 Asistencia directa tras confirmar
   if (callbackData.startsWith("asistir_")) {
     const [, convocatoriaId, cedula] = callbackData.split("_");
 
@@ -176,6 +174,7 @@ bot.on("callback_query", async (ctx) => {
       .eq("convocatoria_id", convocatoriaId);
 
     if (yaAsistio?.length > 0) {
+      await ctx.editMessageReplyMarkup(null); // 🔐 Desactiva botones si aún visibles
       return ctx.reply("🔁 Ya registraste tu asistencia para esta convocatoria.");
     }
 
@@ -193,14 +192,16 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("🚫 Ocurrió un error al registrar tu asistencia.");
     }
 
+    await ctx.editMessageReplyMarkup(null); // 🔐 Oculta botones tras éxito
     return ctx.reply("✅ Asistencia registrada correctamente. ¡Gracias por tu participación!");
   }
 
-  // 🧠 Registro de motivo (evita duplicados)
+  // 🧠 Registro de motivo con protección
   if (callbackData.startsWith("motivo_")) {
     const [_, motivo, cedula] = callbackData.split("_");
 
     if (motivo === "nulo") {
+      await ctx.editMessageReplyMarkup(null);
       return ctx.reply("✅ No se ha registrado participación para hoy.");
     }
 
@@ -211,6 +212,7 @@ bot.on("callback_query", async (ctx) => {
       .eq("fecha", hoy);
 
     if (yaAsistio?.length > 0) {
+      await ctx.editMessageReplyMarkup(null);
       return ctx.reply(`🔁 Ya registraste tu participación con motivo: *${yaAsistio[0].motivo}*`, {
         parse_mode: "Markdown"
       });
@@ -223,7 +225,7 @@ bot.on("callback_query", async (ctx) => {
       .eq("activa", true)
       .maybeSingle();
 
-    const nuevoRegistro = {
+    const nuevo = {
       cedula,
       fecha: hoy,
       registrado_en: new Date().toISOString(),
@@ -231,25 +233,26 @@ bot.on("callback_query", async (ctx) => {
       convocatoria_id: convocatoria?.id || null
     };
 
-    const { error } = await supabase.from("asistencia").insert(nuevoRegistro);
+    const { error } = await supabase.from("asistencia").insert(nuevo);
     if (error) {
-      console.error("❌ Error al registrar motivo:", error);
-      return ctx.reply("🚫 Hubo un error al guardar tu participación.");
+      console.error("❌ Error al guardar motivo:", error);
+      return ctx.reply("🚫 Hubo un error al registrar tu participación.");
     }
 
+    await ctx.editMessageReplyMarkup(null); // 🔐 Ocultar botón tras selección
     return ctx.reply(`✅ Asistencia registrada con motivo: *${motivo}*`, {
       parse_mode: "Markdown"
     });
   }
 });
 
-// lote 4
+// Lote 4
 
-// Iniciar servidor Express en el puerto asignado por Render
+// Iniciar servidor Express
 app.listen(PORT, () => {
-  console.log(`🚀 Bot desplegado y escuchando en puerto ${PORT}`);
+  console.log(`🚀 Bot desplegado y escuchando en el puerto ${PORT}`);
 });
 
-// Detención limpia del bot en caso de señales del sistema
+// Detención limpia del bot ante señales del sistema
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
