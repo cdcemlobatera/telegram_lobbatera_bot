@@ -75,7 +75,7 @@ bot.on("callback_query", async (ctx) => {
     const hoy = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
 
     const { data: existente } = await supabase
-      .from("asistencias")
+      .from("asistencia")
       .select("id")
       .eq("cedula", cedula)
       .eq("fecha", hoy);
