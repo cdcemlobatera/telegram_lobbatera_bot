@@ -85,7 +85,7 @@ bot.on("callback_query", async (ctx) => {
     }
 
     const { error: insertError } = await supabase
-      .from("asistencias")
+      .from("asistencia") // ✅ correcto
       .insert({
         cedula,
         fecha: hoy,
