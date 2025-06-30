@@ -1,37 +1,38 @@
 require("dotenv").config();
 const express = require("express");
-const { createClient } = require("@supabase/supabase-js");
 const { Telegraf } = require("telegraf");
+const { createClient } = require("@supabase/supabase-js");
 const { formatearRespuesta } = require("./utils");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Cliente Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// Crear instancia del bot
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
-// Webhook de Telegram
+// Configurar Webhook en Render
 bot.telegram.setWebhook(`${process.env.BASE_URL}/bot`);
 app.use(bot.webhookCallback("/bot"));
 
-// Ruta básica
-app.get("/", (req, res) => res.send("✅ Bot activo desde Render"));
+app.get("/", (req, res) => res.send("✅ Bot activo y escuchando en webhook"));
 
-//Lote 2
+//lote 2
 
-// Comando /start
 bot.start((ctx) => {
-  ctx.reply("👋 ¡Hola! Envíame una cédula como `V12345678` para ver la ficha del trabajador y registrar asistencia.", {
+  ctx.reply("👋 ¡Hola! Envíame tu cédula en formato `V12345678` para consultar tu ficha y registrar tu participación.", {
     parse_mode: "Markdown"
   });
 });
 
-// Manejo de cédula (mensaje de texto)
 bot.on("text", async (ctx) => {
   const cedulaIngresada = ctx.message.text.trim().toUpperCase().replace(/\s/g, "");
+  const hoy = new Date().toISOString().split("T")[0];
 
   if (!/^V\d{7,8}$/.test(cedulaIngresada)) {
-    return ctx.reply("⚠️ Por favor envía una cédula válida. Ejemplo: V12345678");
+    return ctx.reply("⚠️ Cédula inválida. Ejemplo válido: V12345678");
   }
 
   // Buscar ficha institucional
@@ -45,12 +46,10 @@ bot.on("text", async (ctx) => {
     return ctx.reply("🧐 No encontré información para esa cédula.");
   }
 
-  const ficha = formatearRespuesta(data);
-  await ctx.reply(ficha);
+  // Mostrar ficha institucional
+  await ctx.reply(formatearRespuesta(data));
 
-  const hoy = new Date().toISOString().split("T")[0];
-
-  // Buscar convocatoria activa
+  // Verificar convocatoria activa
   const { data: convocatoriaActiva } = await supabase
     .from("convocatorias")
     .select("*")
@@ -58,78 +57,98 @@ bot.on("text", async (ctx) => {
     .eq("activa", true)
     .maybeSingle();
 
-  if (convocatoriaActiva) {
-    const { id: convocatoriaId, titulo } = convocatoriaActiva;
+  const convocatoriaId = convocatoriaActiva?.id;
 
-    // ¿Ya asistió?
-    const { data: yaAsistio } = await supabase
-      .from("asistencia")
-      .select("id")
+  // Verificar asistencia previa
+  const { data: yaAsistio } = await supabase
+    .from("asistencia")
+    .select("*")
+    .eq("cedula", cedulaIngresada)
+    .eq("fecha", hoy)
+    .maybeSingle();
+
+  if (convocatoriaActiva && !yaAsistio) {
+    // Si ya confirmó
+    const { data: yaConfirmo } = await supabase
+      .from("confirmaciones")
+      .select("*")
       .eq("cedula", cedulaIngresada)
-      .eq("fecha", hoy)
-      .eq("convocatoria_id", convocatoriaId);
+      .eq("convocatoria_id", convocatoriaId)
+      .eq("confirmo", true)
+      .maybeSingle();
 
-    if (yaAsistio?.length > 0) {
-      await ctx.reply("📌 Ya registraste tu asistencia para esta convocatoria.");
+    if (yaConfirmo) {
+      return ctx.reply(`📌 *${convocatoriaActiva.titulo}*\nConfirmaste tu participación.\n¿Deseas registrar tu asistencia ahora?`, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [[{
+            text: "✅ Registrar asistencia ahora",
+            callback_data: `asistir_${convocatoriaId}_${cedulaIngresada}`
+          }]]
+        }
+      });
     } else {
-      // ¿Ya confirmó?
-      const { data: yaConfirmo } = await supabase
-        .from("confirmaciones")
-        .select("*")
-        .eq("cedula", cedulaIngresada)
-        .eq("convocatoria_id", convocatoriaId)
-        .eq("confirmo", true)
-        .maybeSingle();
-
-      if (yaConfirmo) {
-        await ctx.reply(`🗓️ Confirmaste tu participación en: *${titulo}*\n¿Quieres registrar tu asistencia ahora?`, {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "✅ Registrar asistencia ahora", callback_data: `asistir_${convocatoriaId}_${cedulaIngresada}` }]
+      return ctx.reply(`📢 *${convocatoriaActiva.titulo}*\n¿Confirmas tu participación?`, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Asistiré", callback_data: `confirmar_si_${convocatoriaId}_${cedulaIngresada}` },
+              { text: "❌ No podré", callback_data: `confirmar_no_${convocatoriaId}_${cedulaIngresada}` }
             ]
-          }
-        });
-      } else {
-        await ctx.reply(`📢 *${titulo}*\n¿Confirmas tu participación?`, {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "✅ Asistiré", callback_data: `confirmar_si_${convocatoriaId}_${cedulaIngresada}` },
-                { text: "❌ No podré", callback_data: `confirmar_no_${convocatoriaId}_${cedulaIngresada}` }
-              ]
-            ]
-          }
-        });
-      }
+          ]
+        }
+      });
     }
   }
 
-  // Motivos solo si no registró asistencia hoy
-  if (!convocatoriaActiva || !yaAsistio?.length) {
-    await ctx.reply("Selecciona tu motivo de participación para hoy 👇", {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "📌 Reunión Pedagógica", callback_data: `motivo_Reunión Pedagógica_${cedulaIngresada}` }],
-          [{ text: "📚 Consejo de Sección", callback_data: `motivo_Consejo de Sección_${cedulaIngresada}` }],
-          [{ text: "✍️ Solicitar Constancia", callback_data: `motivo_Solicitud de Constancia_${cedulaIngresada}` }],
-          [{ text: "📞 Contactar CDCE Lobatera", callback_data: `motivo_Contacto con CDCE_${cedulaIngresada}` }],
-          [{ text: "✅ Solo marcar asistencia", callback_data: `motivo_Asistencia General_${cedulaIngresada}` }],
-          [{ text: "❌ Ninguno hoy", callback_data: `motivo_nulo_${cedulaIngresada}` }]
-        ]
-      }
+  // 🧩 Lógica de motivos (ajustada del LOTE 5)
+  const motivoRegistrado = yaAsistio?.motivo;
+  const listaMotivos = [
+    "Reunión Pedagógica",
+    "Consejo de Sección",
+    "Solicitud de Constancia",
+    "Contacto con CDCE",
+    "Asistencia General"
+  ];
+
+  if (motivoRegistrado) {
+    const motivosRestantes = listaMotivos.filter(m => m !== motivoRegistrado);
+
+    if (motivosRestantes.length === 0) {
+      return ctx.reply(`✅ Ya registraste tu participación hoy con motivo: *${motivoRegistrado}*`, {
+        parse_mode: "Markdown"
+      });
+    }
+
+    const botones = motivosRestantes.map(m => [{
+      text: `📌 ${m}`,
+      callback_data: `motivo_${m}_${cedulaIngresada}`
+    }]);
+
+    return ctx.reply("¿Deseas registrar otro motivo adicional para hoy?", {
+      reply_markup: { inline_keyboard: botones }
+    });
+  } else {
+    // No hay motivo aún → mostrar todos
+    const botones = listaMotivos.map(m => [{
+      text: `📌 ${m}`,
+      callback_data: `motivo_${m}_${cedulaIngresada}`
+    }]);
+
+    return ctx.reply("Selecciona tu motivo de participación para hoy 👇", {
+      reply_markup: { inline_keyboard: botones }
     });
   }
 });
 
-// lote 3
+//lote 3
 
 bot.on("callback_query", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 🟢 Confirmaciones
+  // ✅ Confirmaciones de convocatoria
   if (callbackData.startsWith("confirmar_")) {
     const [, decision, convocatoriaId, cedula] = callbackData.split("_");
 
@@ -147,13 +166,13 @@ bot.on("callback_query", async (ctx) => {
     );
   }
 
-  // 🟨 Registro directo de asistencia tras confirmar
+  // 🕹️ Asistencia directa tras confirmar
   if (callbackData.startsWith("asistir_")) {
     const [, convocatoriaId, cedula] = callbackData.split("_");
 
     const { data: yaAsistio } = await supabase
       .from("asistencia")
-      .select("id")
+      .select("*")
       .eq("cedula", cedula)
       .eq("fecha", hoy)
       .eq("convocatoria_id", convocatoriaId);
@@ -162,7 +181,7 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("🔁 Ya registraste tu asistencia para esta convocatoria.");
     }
 
-    const nuevoRegistro = {
+    const nuevo = {
       cedula,
       fecha: hoy,
       registrado_en: new Date().toISOString(),
@@ -170,7 +189,7 @@ bot.on("callback_query", async (ctx) => {
       convocatoria_id: parseInt(convocatoriaId)
     };
 
-    const { error } = await supabase.from("asistencia").insert(nuevoRegistro);
+    const { error } = await supabase.from("asistencia").insert(nuevo);
     if (error) {
       console.error("❌ Error al guardar asistencia:", error);
       return ctx.reply("🚫 Ocurrió un error al registrar tu asistencia.");
@@ -179,7 +198,7 @@ bot.on("callback_query", async (ctx) => {
     return ctx.reply("✅ Asistencia registrada correctamente. ¡Gracias por tu participación!");
   }
 
-  // 📌 Registro con motivo de participación
+  // 🎯 Motivo de participación
   if (callbackData.startsWith("motivo_")) {
     const [_, motivo, cedula] = callbackData.split("_");
 
@@ -194,7 +213,7 @@ bot.on("callback_query", async (ctx) => {
       .eq("fecha", hoy);
 
     if (yaAsistio?.length > 0) {
-      return ctx.reply(`🔁 Ya registraste tu asistencia con motivo: *${yaAsistio[0].motivo}*`, {
+      return ctx.reply(`🔁 Ya registraste tu participación con motivo: *${yaAsistio[0].motivo}*`, {
         parse_mode: "Markdown"
       });
     }
@@ -216,8 +235,8 @@ bot.on("callback_query", async (ctx) => {
 
     const { error } = await supabase.from("asistencia").insert(nuevo);
     if (error) {
-      console.error("❌ Error al registrar motivo:", error);
-      return ctx.reply("🚫 Hubo un problema al guardar tu participación.");
+      console.error("❌ Error al guardar motivo:", error);
+      return ctx.reply("🚫 Hubo un error al registrar tu participación.");
     }
 
     return ctx.reply(`✅ Asistencia registrada con motivo: *${motivo}*`, {
@@ -226,13 +245,13 @@ bot.on("callback_query", async (ctx) => {
   }
 });
 
-// lote 4
+//Lote 4
 
-// Inicia el servidor (Render detecta el puerto desde process.env.PORT)
+// Iniciar servidor en puerto asignado (útil en Render)
 app.listen(PORT, () => {
-  console.log(`🚀 Bot en marcha por webhook en puerto ${PORT}`);
+  console.log(`🚀 Bot escuchando vía webhook en puerto ${PORT}`);
 });
 
-// Detención limpia del bot en caso de apagado o reinicio
+// Apagado limpio del bot
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
