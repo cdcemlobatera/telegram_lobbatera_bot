@@ -227,25 +227,28 @@ bot.on("callback_query", async (ctx) => {
   // ✅ Registrar asistencia (solo si es el día exacto)
   if (callbackData.startsWith("asistir_")) {
     const [, convocatoriaId, cedula] = callbackData.split("_");
-
+  
+    // 🔍 Consultar convocatoria activa
     const { data: convocatoriaActiva } = await supabase
       .from("convocatorias")
       .select("*")
       .eq("id", convocatoriaId)
       .maybeSingle();
-
+  
     if (!convocatoriaActiva) {
       await ctx.editMessageReplyMarkup(null);
       return ctx.reply("⚠️ No se encontró información de la convocatoria.");
     }
-
+  
+    // 🕒 Verificar si hoy corresponde a la fecha de asistencia
     if (hoy !== convocatoriaActiva.fecha_asistencia) {
       await ctx.editMessageReplyMarkup(null);
       return ctx.reply(`📅 Solo puedes registrar tu asistencia el *${convocatoriaActiva.fecha_asistencia}*.`, {
         parse_mode: "Markdown"
       });
     }
-
+  
+    // 🔄 Verificar si ya se registró asistencia hoy para esta convocatoria
     const { data: yaAsistio } = await supabase
       .from("asistencia")
       .select("id")
@@ -253,26 +256,35 @@ bot.on("callback_query", async (ctx) => {
       .eq("fecha", hoy)
       .eq("convocatoria_id", convocatoriaId)
       .maybeSingle();
-
+  
     if (yaAsistio) {
       await ctx.editMessageReplyMarkup(null);
       return ctx.reply("🔁 Ya habías registrado tu asistencia hoy.");
     }
-
+  
+    // 🕒 Obtener hora local de Venezuela (America/Caracas)
+    const fechaHoraLocal = new Date().toLocaleString('es-VE', {
+      timeZone: 'America/Caracas'
+    });
+    const [fechaVzla, horaVzla] = fechaHoraLocal.split(', ');
+  
+    // 📝 Construir objeto de asistencia
     const nuevaAsistencia = {
       cedula,
-      fecha: hoy,
+      fecha: hoy, // Esta viene previamente verificada
       motivo: "Asistencia Confirmada",
-      registrado_en: new Date().toISOString(),
+      registrado_en: `${fechaVzla} ${horaVzla}`, // Hora local como string legible
       convocatoria_id: parseInt(convocatoriaId)
     };
-
+  
+    // 💾 Insertar en la base de datos
     const { error } = await supabase.from("asistencia").insert(nuevaAsistencia);
     if (error) {
       console.error("❌ Error al registrar asistencia:", error);
       return ctx.reply("🚫 Ocurrió un error al guardar tu asistencia.");
     }
-
+  
+    // ✅ Confirmación al usuario
     await ctx.editMessageReplyMarkup(null);
     return ctx.reply("✅ Asistencia registrada. ¡Gracias por participar!");
   }
@@ -280,46 +292,55 @@ bot.on("callback_query", async (ctx) => {
   // 🧾 Registrar motivo institucional
   if (callbackData.startsWith("motivo_")) {
     const [, motivo, cedula] = callbackData.split("_");
-
+  
     if (motivo === "nulo") {
       await ctx.editMessageReplyMarkup(null);
       return ctx.reply("📌 Entendido, no se registrará participación hoy.");
     }
-
+  
+    // 🔄 Verificar si ya hay un registro para hoy
     const { data: yaAsistio } = await supabase
       .from("asistencia")
       .select("id, motivo")
       .eq("cedula", cedula)
       .eq("fecha", hoy)
       .maybeSingle();
-
+  
     if (yaAsistio) {
       await ctx.editMessageReplyMarkup(null);
       return ctx.reply(`🔁 Ya registraste hoy con el motivo: *${yaAsistio.motivo}*`, {
         parse_mode: "Markdown"
       });
     }
-
+  
+    // 🕒 Obtener hora local de Venezuela
+    const fechaHoraLocal = new Date().toLocaleString('es-VE', {
+      timeZone: 'America/Caracas'
+    });
+    const [fechaVzla, horaVzla] = fechaHoraLocal.split(', ');
+  
+    // 📝 Construir registro con motivo institucional
     const nuevaAsistencia = {
       cedula,
       fecha: hoy,
       motivo,
-      registrado_en: new Date().toISOString(),
-      convocatoria_id: null // Puede ajustarse si decides asociar a convocatoria
+      registrado_en: `${fechaVzla} ${horaVzla}`,
+      convocatoria_id: null // Si decides no asociarlo a una convocatoria
     };
-
+  
+    // 💾 Insertar en Supabase
     const { error } = await supabase.from("asistencia").insert(nuevaAsistencia);
     if (error) {
       console.error("❌ Error al guardar motivo:", error);
       return ctx.reply("🚫 Hubo un problema al registrar tu participación.");
     }
-
+  
+    // ✅ Confirmación al usuario
     await ctx.editMessageReplyMarkup(null);
     return ctx.reply(`✅ Participación registrada con motivo: *${motivo}*`, {
       parse_mode: "Markdown"
     });
   }
-});
 
 // LOTE 4: Inicio del servidor y manejo de apagado controlado
 
