@@ -346,6 +346,7 @@ bot.on("callback_query", async (ctx) => {
       parse_mode: "Markdown"
     });
   }
+}
 
 // LOTE 4: Inicio del servidor y manejo de apagado controlado
 
