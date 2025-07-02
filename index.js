@@ -5,7 +5,8 @@ require("dotenv").config(); // 🔐 Variables de entorno desde .env
 const express = require("express");
 const { Telegraf } = require("telegraf");
 const { createClient } = require("@supabase/supabase-js");
-const { formatearRespuesta } = require("./utils"); // 📄 Función para mostrar la ficha
+//const { formatearRespuesta } = require("./utils"); // 📄 Función para mostrar la ficha
+const { formatearRespuesta, obtenerFechaHoraVzla } = require("./utils"); // 📄 Función para mostrar la ficha
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -263,10 +264,12 @@ bot.on("callback_query", async (ctx) => {
     }
   
     // 🕒 Obtener hora local de Venezuela (America/Caracas)
-    const fechaHoraLocal = new Date().toLocaleString('es-VE', {
-      timeZone: 'America/Caracas'
-    });
-    const [fechaVzla, horaVzla] = fechaHoraLocal.split(', ');
+    //const fechaHoraLocal = new Date().toLocaleString('es-VE', {
+    //  timeZone: 'America/Caracas'
+    //});
+    //const [fechaVzla, horaVzla] = fechaHoraLocal.split(', ');
+
+    const [fechaVzla, horaVzla] = obtenerFechaHoraVzla();
   
     // 📝 Construir objeto de asistencia
     const nuevaAsistencia = {
@@ -314,10 +317,12 @@ bot.on("callback_query", async (ctx) => {
     }
   
     // 🕒 Obtener hora local de Venezuela
-    const fechaHoraLocal = new Date().toLocaleString('es-VE', {
-      timeZone: 'America/Caracas'
-    });
-    const [fechaVzla, horaVzla] = fechaHoraLocal.split(', ');
+    //const fechaHoraLocal = new Date().toLocaleString('es-VE', {
+    //  timeZone: 'America/Caracas'
+    //});
+    //const [fechaVzla, horaVzla] = fechaHoraLocal.split(', ');
+
+    const [fechaVzla, horaVzla] = obtenerFechaHoraVzla();
   
     // 📝 Construir registro con motivo institucional
     const nuevaAsistencia = {
