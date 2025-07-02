@@ -1,41 +1,43 @@
-// LOTE 1: Configuración base y servicios
-require("dotenv").config(); // 🔐 Carga de variables de entorno (.env)
+// LOTE 1: Configuración base y conexión de servicios
 
-const express = require("express");         // 🌐 Servidor para webhook
-const { Telegraf } = require("telegraf");   // 🤖 Librería del bot Telegram
-const { createClient } = require("@supabase/supabase-js"); // 🔗 Cliente para Supabase
-const { formatearRespuesta } = require("./utils"); // 📄 Función personalizada para mostrar ficha de usuario
+require("dotenv").config(); // 🔐 Variables de entorno desde .env
+
+const express = require("express");
+const { Telegraf } = require("telegraf");
+const { createClient } = require("@supabase/supabase-js");
+const { formatearRespuesta } = require("./utils"); // 📄 Función para mostrar la ficha
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🧠 Inicializa Supabase con las claves de entorno
+// 🔗 Cliente Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
-// 🤖 Inicializa el bot de Telegram
+// 🤖 Inicializa el bot con el token
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
-// Configura el webhook de Telegram (Render, Railway, etc.)
+// 🔌 Webhook para Render/Railway
 bot.telegram.setWebhook(`${process.env.BASE_URL}/bot`);
 app.use(bot.webhookCallback("/bot"));
 
-// Ruta simple para verificar que el servidor responde
-app.get("/", (req, res) => res.send("✅ Bot educativo activo y operativo"));
+// 🌐 Ruta simple para verificar el estado del bot
+app.get("/", (req, res) => res.send("📡 Bot educativo activo y escuchando"));
 
-// LOTE 2: Procesamiento de cédula e inicio de flujo
+// LOTE 2: Flujo al recibir una cédula válida
+
 bot.on("text", async (ctx) => {
   const cedulaIngresada = ctx.message.text.trim().toUpperCase().replace(/\s/g, "");
   const hoy = new Date().toISOString().split("T")[0];
 
-  // Validación de formato
+  // Validar formato de cédula
   if (!/^V\d{7,8}$/.test(cedulaIngresada)) {
     return ctx.reply("⚠️ Cédula inválida. Ejemplo válido: V12345678");
   }
 
-  // Consulta de ficha institucional
+  // Buscar ficha personal
   const { data: persona, error } = await supabase
     .from("raclobatera")
     .select("*")
@@ -43,13 +45,13 @@ bot.on("text", async (ctx) => {
     .maybeSingle();
 
   if (error || !persona) {
-    return ctx.reply("🧐 No encontré información para esa cédula.");
+    return ctx.reply("🧐 No encontré datos asociados a esa cédula.");
   }
 
-  // Muestra la ficha al usuario
+  // Mostrar ficha institucional
   await ctx.reply(formatearRespuesta(persona));
 
-  // Consulta convocatoria activa (fecha dentro de rango + activa = true)
+  // Consultar si hay convocatoria activa
   const { data: convocatoriaActiva } = await supabase
     .from("convocatorias")
     .select("*")
@@ -58,10 +60,9 @@ bot.on("text", async (ctx) => {
     .gte("fecha_fin", hoy)
     .maybeSingle();
 
-  // 🎯 SI NO HAY convocatoria → mostrar menú institucional
+  // Si NO hay convocatoria → mostrar menú institucional (motivos)
   if (!convocatoriaActiva) {
-    await ctx.reply("ℹ️ No hay convocatorias activas en este momento.");
-    await ctx.reply("Puedes registrar tu participación institucional eligiendo uno de los siguientes motivos:", {
+    await ctx.reply("📌 No hay convocatorias activas.\nPuedes registrar tu participación institucional eligiendo un motivo:", {
       reply_markup: {
         inline_keyboard: [
           [{ text: "📌 Reunión Pedagógica", callback_data: `motivo_Reunión Pedagógica_${cedulaIngresada}` }],
@@ -73,31 +74,35 @@ bot.on("text", async (ctx) => {
         ]
       }
     });
-    return; // 🛑 Detiene el flujo aquí si no hay convocatoria
+    return;
   }
 
-  // Si hay convocatoria, continúa el flujo normal:
   const convocatoriaId = convocatoriaActiva.id;
+  const fechaConfirmacion = convocatoriaActiva.fecha_confirmacion;
+  const fechaAsistencia = convocatoriaActiva.fecha_asistencia;
 
-  const { data: yaAsistio } = await supabase
-    .from("asistencia")
-    .select("id")
-    .eq("cedula", cedulaIngresada)
-    .eq("fecha", hoy)
-    .eq("convocatoria_id", convocatoriaId)
-    .maybeSingle();
-
+  // Verificar confirmación y asistencia previas
   const { data: yaConfirmo } = await supabase
     .from("confirmaciones")
     .select("*")
     .eq("cedula", cedulaIngresada)
     .eq("convocatoria_id", convocatoriaId)
-    .eq("confirmo", true)
     .maybeSingle();
 
-  // Si ya asistió
+  const { data: yaAsistio } = await supabase
+    .from("asistencia")
+    .select("*")
+    .eq("cedula", cedulaIngresada)
+    .eq("fecha", hoy)
+    .eq("convocatoria_id", convocatoriaId)
+    .maybeSingle();
+
+  const yaConfirmoSi = yaConfirmo?.confirmo === true;
+  const yaConfirmoNo = yaConfirmo?.confirmo === false;
+
+  // Si ya asistió → mostrar aviso + ficha
   if (yaAsistio) {
-    return ctx.reply(`✅ Ya registraste tu asistencia para: *${convocatoriaActiva.titulo}*.\nGracias por tu participación 👏`, {
+    return ctx.reply(`✅ Ya registraste tu asistencia para *${convocatoriaActiva.titulo}*.\n\nGracias por participar 👏`, {
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
@@ -107,42 +112,86 @@ bot.on("text", async (ctx) => {
     });
   }
 
-  // Si ya confirmó, pero no ha asistido aún
-  if (yaConfirmo) {
-    return ctx.reply(`📌 Ya confirmaste tu participación en: *${convocatoriaActiva.titulo}*\n¿Deseas registrar tu asistencia ahora?`, {
-      parse_mode: "Markdown",
+  // Si confirmó que NO irá
+  if (yaConfirmoNo) {
+    await ctx.reply(`📌 Has indicado que NO asistirás a *${convocatoriaActiva.titulo}*`, {
+      parse_mode: "Markdown"
+    });
+
+    return ctx.reply("Si deseas registrar otra actividad institucional hoy, selecciona un motivo:", {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "✅ Registrar asistencia ahora", callback_data: `asistir_${convocatoriaId}_${cedulaIngresada}` }],
-          [{ text: "👁️ Solo consultar ficha", callback_data: `solo_${cedulaIngresada}` }]
+          [{ text: "👁️ Solo consultar ficha", callback_data: `solo_${cedulaIngresada}` }],
+          [{ text: "📌 Reunión Pedagógica", callback_data: `motivo_Reunión Pedagógica_${cedulaIngresada}` }],
+          [{ text: "📚 Consejo de Sección", callback_data: `motivo_Consejo de Sección_${cedulaIngresada}` }],
+          [{ text: "✍️ Solicitar Constancia", callback_data: `motivo_Solicitud de Constancia_${cedulaIngresada}` }],
+          [{ text: "📞 Contactar CDCE Lobatera", callback_data: `motivo_Contacto con CDCE_${cedulaIngresada}` }],
+          [{ text: "✅ Solo marcar asistencia", callback_data: `motivo_Asistencia General_${cedulaIngresada}` }]
         ]
       }
     });
   }
 
-  // Si aún no ha confirmado
-  return ctx.reply(`📢 *${convocatoriaActiva.titulo}*\n¿Confirmas tu participación en esta actividad?`, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Sí, asistiré", callback_data: `confirmar_si_${convocatoriaId}_${cedulaIngresada}` },
-          { text: "❌ No podré", callback_data: `confirmar_no_${convocatoriaId}_${cedulaIngresada}` }
-        ],
-        [
-          { text: "👁️ Solo consultar ficha", callback_data: `solo_${cedulaIngresada}` }
-        ]
-      ]
+  // Si ya confirmó que SÍ irá
+  if (yaConfirmoSi) {
+    if (hoy === fechaAsistencia) {
+      // ✅ Mostrar botón para registrar asistencia solo hoy
+      return ctx.reply("📍 ¿Deseas registrar tu asistencia ahora?", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "✅ Registrar asistencia ahora", callback_data: `asistir_${convocatoriaId}_${cedulaIngresada}` }],
+            [{ text: "👁️ Solo consultar ficha", callback_data: `solo_${cedulaIngresada}` }]
+          ]
+        }
+      });
+    } else {
+      // ⏳ Aún no es día de asistir → ofrecer motivos alternativos
+      await ctx.reply(`📌 Ya confirmaste para *${convocatoriaActiva.titulo}*.\n📅 Podrás registrar tu asistencia el *${fechaAsistencia}*`, {
+        parse_mode: "Markdown"
+      });
+
+      return ctx.reply("Mientras tanto, puedes consultar tu ficha o registrar otra actividad institucional:", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "👁️ Solo consultar ficha", callback_data: `solo_${cedulaIngresada}` }],
+            [{ text: "📌 Reunión Pedagógica", callback_data: `motivo_Reunión Pedagógica_${cedulaIngresada}` }],
+            [{ text: "📚 Consejo de Sección", callback_data: `motivo_Consejo de Sección_${cedulaIngresada}` }],
+            [{ text: "✍️ Solicitar Constancia", callback_data: `motivo_Solicitud de Constancia_${cedulaIngresada}` }],
+            [{ text: "📞 Contactar CDCE Lobatera", callback_data: `motivo_Contacto con CDCE_${cedulaIngresada}` }],
+            [{ text: "✅ Solo marcar asistencia", callback_data: `motivo_Asistencia General_${cedulaIngresada}` }]
+          ]
+        }
+      });
     }
-  });
+  }
+
+  // Si aún NO ha confirmado → evaluar si estamos dentro de la ventana válida
+  if (hoy >= fechaConfirmacion && hoy < fechaAsistencia) {
+    return ctx.reply(`📢 *${convocatoriaActiva.titulo}*\n¿Confirmas tu participación?`, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Sí, asistiré", callback_data: `confirmar_si_${convocatoriaId}_${cedulaIngresada}` },
+            { text: "❌ No podré", callback_data: `confirmar_no_${convocatoriaId}_${cedulaIngresada}` }
+          ]
+        ]
+      }
+    });
+  } else {
+    return ctx.reply(`📅 Puedes confirmar tu participación entre el *${fechaConfirmacion}* y antes del *${fechaAsistencia}*.\nHoy no está habilitado para confirmar.`, {
+      parse_mode: "Markdown"
+    });
+  }
 });
 
-// LOTE 3: Acciones del usuario (confirmar, asistir, motivo, consulta)
+// LOTE 3: Manejo de botones de interacción
+
 bot.on("callback_query", async (ctx) => {
   const callbackData = ctx.callbackQuery.data;
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 🟢 Confirmar participación (sí / no)
+  // 👉 Confirmar asistencia
   if (callbackData.startsWith("confirmar_")) {
     const [, decision, convocatoriaId, cedula] = callbackData.split("_");
     await ctx.editMessageReplyMarkup(null);
@@ -157,13 +206,14 @@ bot.on("callback_query", async (ctx) => {
     return ctx.reply(
       decision === "si"
         ? "✅ Confirmación registrada. ¡Nos vemos en la actividad!"
-        : "👍 Entendido. No asistirás a esta convocatoria."
+        : "📝 Has indicado que no podrás asistir. Gracias por notificar."
     );
   }
 
   // 👁️ Solo consultar ficha
   if (callbackData.startsWith("solo_")) {
     const [, cedula] = callbackData.split("_");
+
     const { data: persona } = await supabase
       .from("raclobatera")
       .select("*")
@@ -171,216 +221,112 @@ bot.on("callback_query", async (ctx) => {
       .maybeSingle();
 
     await ctx.editMessageReplyMarkup(null);
-    return ctx.reply(`👁️ Consulta realizada. No se ha registrado confirmación ni asistencia.\n\n${formatearRespuesta(persona)}`);
+    return ctx.reply(`👁️ Consulta realizada. No se ha registrado asistencia hoy.\n\n${formatearRespuesta(persona)}`);
   }
 
-  // ✅ Registrar asistencia
+  // ✅ Registrar asistencia (solo si es el día exacto)
   if (callbackData.startsWith("asistir_")) {
     const [, convocatoriaId, cedula] = callbackData.split("_");
 
-    const { data: yaAsistio } = await supabase
-      .from("asistencia")
-      .select("id")
-      .eq("cedula", cedula)
-      .eq("fecha", hoy)
-      .eq("convocatoria_id", convocatoriaId);
-
-    if (yaAsistio?.length > 0) {
-      await ctx.editMessageReplyMarkup(null);
-      return ctx.reply("🔁 Ya registraste tu asistencia para esta convocatoria.");
-    }
-
-    const nuevo = {
-      cedula,
-      fecha: hoy,
-      registrado_en: new Date().toISOString(),
-      motivo: "Asistencia Confirmada",
-      convocatoria_id: parseInt(convocatoriaId)
-    };
-
-    const { error } = await supabase.from("asistencia").insert(nuevo);
-    if (error) {
-      console.error("❌ Error al guardar asistencia:", error);
-      return ctx.reply("🚫 Ocurrió un error al registrar tu asistencia.");
-    }
-
-    await ctx.editMessageReplyMarkup(null);
-    return ctx.reply("✅ Asistencia registrada correctamente. ¡Gracias por tu participación!");
-  }
-
-  // 📋 Registrar participación con motivo institucional
-  if (callbackData.startsWith("motivo_")) {
-    const [, motivo, cedula] = callbackData.split("_");
-
-    if (motivo === "nulo") {
-      await ctx.editMessageReplyMarkup(null);
-      return ctx.reply("✅ No se ha registrado participación para hoy.");
-    }
-
-    // Verificar si ya tiene asistencia hoy
-    const { data: yaAsistio } = await supabase
-      .from("asistencia")
-      .select("id, motivo")
-      .eq("cedula", cedula)
-      .eq("fecha", hoy);
-
-    if (yaAsistio?.length > 0) {
-      await ctx.editMessageReplyMarkup(null);
-      return ctx.reply(`🔁 Ya registraste tu participación con motivo: *${yaAsistio[0].motivo}*`, {
-        parse_mode: "Markdown"
-      });
-    }
-
-    // Obtener convocatoria activa (por si deseas asociarla)
-    const { data: convocatoria } = await supabase
+    const { data: convocatoriaActiva } = await supabase
       .from("convocatorias")
-      .select("id")
-      .eq("activa", true)
-      .lte("fecha_inicio", hoy)
-      .gte("fecha_fin", hoy)
-      .maybeSingle();
-
-    const nuevo = {
-      cedula,
-      fecha: hoy,
-      registrado_en: new Date().toISOString(),
-      motivo,
-      convocatoria_id: convocatoria?.id || null
-    };
-
-    const { error } = await supabase.from("asistencia").insert(nuevo);
-    if (error) {
-      console.error("❌ Error al guardar motivo:", error);
-      return ctx.reply("🚫 Hubo un error al registrar tu participación.");
-    }
-
-    await ctx.editMessageReplyMarkup(null);
-    return ctx.reply(`✅ Asistencia registrada con motivo: *${motivo}*`, {
-      parse_mode: "Markdown"
-    });
-  }
-});
-
-// LOTE 3: Acciones del usuario (confirmar, asistir, motivo, consulta)
-bot.on("callback_query", async (ctx) => {
-  const callbackData = ctx.callbackQuery.data;
-  const hoy = new Date().toISOString().split("T")[0];
-
-  // 🟢 Confirmar participación (sí / no)
-  if (callbackData.startsWith("confirmar_")) {
-    const [, decision, convocatoriaId, cedula] = callbackData.split("_");
-    await ctx.editMessageReplyMarkup(null);
-
-    await supabase.from("confirmaciones").insert({
-      cedula,
-      convocatoria_id: parseInt(convocatoriaId),
-      confirmo: decision === "si",
-      fecha_confirmacion: new Date().toISOString()
-    });
-
-    return ctx.reply(
-      decision === "si"
-        ? "✅ Confirmación registrada. ¡Nos vemos en la actividad!"
-        : "👍 Entendido. No asistirás a esta convocatoria."
-    );
-  }
-
-  // 👁️ Solo consultar ficha
-  if (callbackData.startsWith("solo_")) {
-    const [, cedula] = callbackData.split("_");
-    const { data: persona } = await supabase
-      .from("raclobatera")
       .select("*")
-      .eq("cedula", cedula)
+      .eq("id", convocatoriaId)
       .maybeSingle();
 
-    await ctx.editMessageReplyMarkup(null);
-    return ctx.reply(`👁️ Consulta realizada. No se ha registrado confirmación ni asistencia.\n\n${formatearRespuesta(persona)}`);
-  }
+    if (!convocatoriaActiva) {
+      await ctx.editMessageReplyMarkup(null);
+      return ctx.reply("⚠️ No se encontró información de la convocatoria.");
+    }
 
-  // ✅ Registrar asistencia
-  if (callbackData.startsWith("asistir_")) {
-    const [, convocatoriaId, cedula] = callbackData.split("_");
+    if (hoy !== convocatoriaActiva.fecha_asistencia) {
+      await ctx.editMessageReplyMarkup(null);
+      return ctx.reply(`📅 Solo puedes registrar tu asistencia el *${convocatoriaActiva.fecha_asistencia}*.`, {
+        parse_mode: "Markdown"
+      });
+    }
 
     const { data: yaAsistio } = await supabase
       .from("asistencia")
       .select("id")
       .eq("cedula", cedula)
       .eq("fecha", hoy)
-      .eq("convocatoria_id", convocatoriaId);
+      .eq("convocatoria_id", convocatoriaId)
+      .maybeSingle();
 
-    if (yaAsistio?.length > 0) {
+    if (yaAsistio) {
       await ctx.editMessageReplyMarkup(null);
-      return ctx.reply("🔁 Ya registraste tu asistencia para esta convocatoria.");
+      return ctx.reply("🔁 Ya habías registrado tu asistencia hoy.");
     }
 
-    const nuevo = {
+    const nuevaAsistencia = {
       cedula,
       fecha: hoy,
-      registrado_en: new Date().toISOString(),
       motivo: "Asistencia Confirmada",
+      registrado_en: new Date().toISOString(),
       convocatoria_id: parseInt(convocatoriaId)
     };
 
-    const { error } = await supabase.from("asistencia").insert(nuevo);
+    const { error } = await supabase.from("asistencia").insert(nuevaAsistencia);
     if (error) {
-      console.error("❌ Error al guardar asistencia:", error);
-      return ctx.reply("🚫 Ocurrió un error al registrar tu asistencia.");
+      console.error("❌ Error al registrar asistencia:", error);
+      return ctx.reply("🚫 Ocurrió un error al guardar tu asistencia.");
     }
 
     await ctx.editMessageReplyMarkup(null);
-    return ctx.reply("✅ Asistencia registrada correctamente. ¡Gracias por tu participación!");
+    return ctx.reply("✅ Asistencia registrada. ¡Gracias por participar!");
   }
 
-  // 📋 Registrar participación con motivo institucional
+  // 🧾 Registrar motivo institucional
   if (callbackData.startsWith("motivo_")) {
     const [, motivo, cedula] = callbackData.split("_");
 
     if (motivo === "nulo") {
       await ctx.editMessageReplyMarkup(null);
-      return ctx.reply("✅ No se ha registrado participación para hoy.");
+      return ctx.reply("📌 Entendido, no se registrará participación hoy.");
     }
 
-    // Verificar si ya tiene asistencia hoy
     const { data: yaAsistio } = await supabase
       .from("asistencia")
       .select("id, motivo")
       .eq("cedula", cedula)
-      .eq("fecha", hoy);
+      .eq("fecha", hoy)
+      .maybeSingle();
 
-    if (yaAsistio?.length > 0) {
+    if (yaAsistio) {
       await ctx.editMessageReplyMarkup(null);
-      return ctx.reply(`🔁 Ya registraste tu participación con motivo: *${yaAsistio[0].motivo}*`, {
+      return ctx.reply(`🔁 Ya registraste hoy con el motivo: *${yaAsistio.motivo}*`, {
         parse_mode: "Markdown"
       });
     }
 
-    // Obtener convocatoria activa (por si deseas asociarla)
-    const { data: convocatoria } = await supabase
-      .from("convocatorias")
-      .select("id")
-      .eq("activa", true)
-      .lte("fecha_inicio", hoy)
-      .gte("fecha_fin", hoy)
-      .maybeSingle();
-
-    const nuevo = {
+    const nuevaAsistencia = {
       cedula,
       fecha: hoy,
-      registrado_en: new Date().toISOString(),
       motivo,
-      convocatoria_id: convocatoria?.id || null
+      registrado_en: new Date().toISOString(),
+      convocatoria_id: null // Puede ajustarse si decides asociar a convocatoria
     };
 
-    const { error } = await supabase.from("asistencia").insert(nuevo);
+    const { error } = await supabase.from("asistencia").insert(nuevaAsistencia);
     if (error) {
       console.error("❌ Error al guardar motivo:", error);
-      return ctx.reply("🚫 Hubo un error al registrar tu participación.");
+      return ctx.reply("🚫 Hubo un problema al registrar tu participación.");
     }
 
     await ctx.editMessageReplyMarkup(null);
-    return ctx.reply(`✅ Asistencia registrada con motivo: *${motivo}*`, {
+    return ctx.reply(`✅ Participación registrada con motivo: *${motivo}*`, {
       parse_mode: "Markdown"
     });
   }
 });
+
+// LOTE 4: Inicio del servidor y manejo de apagado controlado
+
+app.listen(PORT, () => {
+  console.log(`🚀 Bot educativo escuchando en el puerto ${PORT}`);
+});
+
+// ⏹️ Manejo de apagado limpio (recomendado en Render/Railway)
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
