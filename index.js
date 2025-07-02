@@ -50,7 +50,14 @@ bot.on("text", async (ctx) => {
   }
 
   // Mostrar ficha institucional
-  await ctx.reply(formatearRespuesta(persona));
+  //await ctx.reply(formatearRespuesta(persona));
+  // Mostrar ficha institucional
+  try {
+    await ctx.reply(formatearRespuesta(persona));
+  } catch (err) {
+    console.error("❌ Error al formatear respuesta:", err);
+    await ctx.reply("🚫 Ocurrió un problema al mostrar la ficha.");
+  }
 
   // Consultar si hay convocatoria activa
   const { data: convocatoriaActiva } = await supabase
