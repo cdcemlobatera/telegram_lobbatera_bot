@@ -1,3 +1,4 @@
+// 📆 Calcula la antigüedad en años y meses desde la fecha de ingreso
 function calcularTiempo(fecha) {
   const hoy = new Date();
   const ingreso = new Date(fecha);
@@ -10,8 +11,14 @@ function calcularTiempo(fecha) {
   return { anos, meses };
 }
 
+// 📝 Formatea la ficha institucional con datos del personal
 function formatearRespuesta(data) {
-  const genero = data.sexo === "F" ? "FEMENINO" : data.sexo === "M" ? "MASCULINO" : "NO ESPECIFICADO";
+  const genero = data.sexo === "F"
+    ? "FEMENINO"
+    : data.sexo === "M"
+    ? "MASCULINO"
+    : "NO ESPECIFICADO";
+
   const tipoPersonal = {
     D: "DOCENTE",
     A: "ADMINISTRATIVO",
@@ -56,4 +63,17 @@ function formatearRespuesta(data) {
 `.trim();
 }
 
-module.exports = { formatearRespuesta, calcularTiempo };
+// ⏱️ Devuelve la fecha y hora local de Caracas como [fecha, hora]
+function obtenerFechaHoraVzla() {
+  const fechaHora = new Date().toLocaleString('es-VE', {
+    timeZone: 'America/Caracas'
+  });
+  return fechaHora.split(', ');
+}
+
+// 🧩 Exportar funciones utilitarias
+module.exports = {
+  formatearRespuesta,
+  calcularTiempo,
+  obtenerFechaHoraVzla
+};
